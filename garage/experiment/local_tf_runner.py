@@ -164,7 +164,7 @@ class LocalRunner:
 
         """
         if self.n_epoch_cycles == 1:
-            logger.log("Obtaining samples...")
+            logger.log('Obtaining samples...')
         return self.sampler.obtain_samples(itr, batch_size)
 
     def save_snapshot(self, itr, paths=None):
@@ -175,12 +175,12 @@ class LocalRunner:
             paths: Batch of samples after preprocessed.
 
         """
-        logger.log("Saving snapshot...")
+        logger.log('Saving snapshot...')
         params = self.algo.get_itr_snapshot(itr, paths)
         if paths:
-            params["paths"] = paths
+            params['paths'] = paths
         snapshotter.save_itr_params(itr, params)
-        logger.log("Saved")
+        logger.log('Saved')
 
     def log_diagnostics(self, pause_for_plot=False):
         """Log diagnostics.
@@ -195,7 +195,7 @@ class LocalRunner:
         if self.plot:
             self.plotter.update_plot(self.policy, self.algo.max_path_length)
             if pause_for_plot:
-                input("Plotting evaluation run: Press Enter to " "continue...")
+                input('Plotting evaluation run: Press Enter to " "continue...')
 
     def train(self,
               n_epochs,
@@ -220,8 +220,7 @@ class LocalRunner:
             The average return in last epoch cycle.
 
         """
-        assert self.has_setup, "Use Runner.setup() to setup runner " \
-                               "before training."
+        assert self.has_setup, 'Use Runner.setup() to setup runner before training.'
         if batch_size is None:
             from garage.tf.samplers import OffPolicyVectorizedSampler
             if isinstance(self.sampler, OffPolicyVectorizedSampler):
@@ -248,6 +247,8 @@ class LocalRunner:
                     itr += 1
                 self.save_snapshot(epoch, paths if store_paths else None)
                 self.log_diagnostics(pause_for_plot)
+                logger.dump_all(itr)
+                tabular.clear()
 
         self.shutdown_worker()
         return last_return
