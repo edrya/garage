@@ -1,6 +1,11 @@
-import pickle
-
+import gym
+import json
+import matplotlib.pyplot as plt
 import numpy as np
+import os.path as osp
+import os
+import pickle
+import pandas as pd
 
 from tests.quirks import KNOWN_GYM_RENDER_NOT_IMPLEMENTED
 
@@ -97,3 +102,102 @@ def max_pooling(_input, pool_shape, pool_stride):
                                pool_shape, k])
 
     return results
+
+
+class AutoStopEnv(gym.Wrapper):
+    """A env wrapper that stops rollout at step 100."""
+
+    def __init__(self, env=None, env_name=""):
+        if env_name:
+            super().__init__(gym.make(env_name))
+        else:
+            super().__init__(env)
+        self._rollout_step = 0
+        self._max_path_length = 100
+
+    def step(self, actions):
+        self._rollout_step += 1
+        next_obs, reward, done, info = self.env.step(actions)
+        if self._rollout_step == self._max_path_length:
+            done = True
+            self._rollout_step = 0
+        return next_obs, reward, done, info
+
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
+
+
+class ResultsHelper:
+
+    def write_file(result_json, algo):
+        latest_dir = "./latest_results"
+        latest_result = latest_dir + "/progress.json"
+        res = {}
+        if osp.exists(latest_result):
+            res = json.loads(open(latest_result, 'r').read())
+        elif not osp.exists(latest_dir):
+            os.makedirs(latest_dir)
+        res[algo] = result_json
+        result_file = open(latest_result, "w")
+        result_file.write(json.dumps(res))
+
+
+    def create_json(b_csvs, g_csvs, trails, seeds, b_x, b_y, g_x, g_y, factor):
+        task_result = {}
+        for trail in range(trails):
+            g_res, b_res = {}, {}
+            trail_seed = "trail_%d" % (trail + 1)
+            task_result["seed"] = seeds[trail]
+            task_result[trail_seed] = {}
+            df_g = json.loads(pd.read_csv(g_csvs[trail]).to_json())
+            df_b = json.loads(pd.read_csv(b_csvs[trail]).to_json())
+
+            g_res["time_steps"] = list(map(lambda x: float(x) * factor, df_g[g_x].values()))
+            g_res["return"] = df_g[g_y]
+
+            b_res["time_steps"] = list(map(lambda x: float(x) * factor, df_b[b_x].values()))
+            b_res["return"] = df_b[b_y]
+
+            task_result[trail_seed]["garage"] = g_res
+            task_result[trail_seed]["baselines"] = b_res
+        return task_result
+
+    def plot(b_csvs, g_csvs, g_x, g_y, b_x, b_y, trials, seeds, plt_file, env_id,x_label,y_label):
+        """
+        Plot benchmark from csv files of garage and baselines.
+
+        :param b_csvs: A list contains all csv files in the task.
+        :param g_csvs: A list contains all csv files in the task.
+        :param g_x: X column names of garage csv.
+        :param g_y: Y column names of garage csv.
+        :param b_x: X column names of baselines csv.
+        :param b_y: Y column names of baselines csv.
+        :param trials: Number of trials in the task.
+        :param seeds: A list contains all the seeds in the task.
+        :param plt_file: Path of the plot png file.
+        :param env_id: String contains the id of the environment.
+        :return:
+        """
+        assert len(b_csvs) == len(g_csvs)
+        for trial in range(trials):
+            seed = seeds[trial]
+
+            df_g = pd.read_csv(g_csvs[trial])
+            df_b = pd.read_csv(b_csvs[trial])
+
+            plt.plot(
+                df_g[g_x],
+                df_g[g_y],
+                label="garage_trial%d_seed%d" % (trial + 1, seed))
+            plt.plot(
+                df_b[b_x],
+                df_b[b_y],
+                label="baselines_trial%d_seed%d" % (trial + 1, seed))
+
+        plt.legend()
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
+        plt.title(env_id)
+
+        plt.savefig(plt_file)
+        plt.close()

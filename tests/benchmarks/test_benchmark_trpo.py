@@ -44,6 +44,7 @@ class TestBenchmarkPPO(unittest.TestCase):
 
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-%f")
         benchmark_dir = "./data/local/benchmarks/trpo/%s/" % timestamp
+        results_json = {}
         for task in mujoco1m["tasks"]:
             env_id = task["env_id"]
             env = gym.make(env_id)
@@ -78,7 +79,7 @@ class TestBenchmarkPPO(unittest.TestCase):
                 garage_csvs.append(garage_csv)
                 baselines_csvs.append(baselines_csv)
 
-            plot(
+            rh.plot(
                 b_csvs=baselines_csvs,
                 g_csvs=garage_csvs,
                 g_x="Iteration",
@@ -88,10 +89,25 @@ class TestBenchmarkPPO(unittest.TestCase):
                 trials=task["trials"],
                 seeds=seeds,
                 plt_file=plt_file,
-                env_id=env_id)
+                env_id=env_id,
+                x_label="Iteration",
+                y_label="AverageReturn")
 
+            result_json[env_id] = create_json(
+                b_csvs=baselines_csvs,
+                g_csvs=garage_csvs,
+                seeds=seeds,
+                trails=task["trials"],
+                g_x="Iteration",
+                g_y="AverageReturn",
+                b_x="TimestepsSoFar",
+                b_y="EpRewMean",
+                factor_g=1024,
+                factor_b=1)
             env.close()
 
+        write_file(result_json, "TRPO")
+           
     test_benchmark_trpo.huge = True
 
 
